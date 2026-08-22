@@ -1,0 +1,3 @@
+Maia-3 is an AGPL-3.0 project.
+Source: https://github.com/CSSLab/maia3
+License: AGPL-3.0

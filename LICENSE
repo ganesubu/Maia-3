@@ -1,0 +1,13 @@
+SPDX-License-Identifier: AGPL-3.0
+
+Maia 3 Web App — License
+
+Except where a file or directory carries a different third-party license
+or notice, the original code and original modifications in this repository
+are licensed under the GNU Affero General Public License, version 3.0.
+
+See:
+https://www.gnu.org/licenses/agpl-3.0.html
+
+Third-party components remain under their own licenses. See
+THIRD-PARTY-NOTICES.md and the files under licenses/.

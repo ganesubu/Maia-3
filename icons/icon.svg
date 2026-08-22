@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Maia3 Chess">
+  <rect x="4" y="4" width="92" height="92" rx="20" fill="#14211c" stroke="#c9a227" stroke-width="1.6"/>
+  <polygon points="30,78 30,68 34,60 33,50 38,38 47,28 58,24 66,27 63,31 70,34 74,40 70,42 72,48 68,50 70,58 66,66 70,78"
+           fill="#ede6d6"/>
+  <circle cx="58.5" cy="33.5" r="2.2" fill="#14211c"/>
+  <rect x="28" y="78" width="44" height="5" fill="#e6c257"/>
+</svg>

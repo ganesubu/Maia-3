@@ -1,0 +1,10 @@
+Maia-3 is licensed under the GNU Affero General Public License, version 3.0.
+
+This project uses Maia-3 code/model functionality from:
+https://github.com/CSSLab/maia3
+
+Official license text:
+https://www.gnu.org/licenses/agpl-3.0.html
+
+The original Maia-3 repository identifies itself as AGPL-3.0.
+This notice is provided so the provenance and applicable license are explicit.

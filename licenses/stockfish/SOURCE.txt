@@ -1,0 +1,8 @@
+Stockfish.js source used by this project:
+https://github.com/nmrugg/stockfish.js
+
+Package version used by the build workflow:
+stockfish@18.0.8
+
+Stockfish is GPL-3.0. See stockfish/Copying.txt and
+licenses/stockfish/GPL-3.0.txt.

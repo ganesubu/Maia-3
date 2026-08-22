@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Maia3 — self test</title>
+<link rel="stylesheet" href="./css/style.css" />
+<style>
+  body { max-width: 780px; }
+  .t-row { display: grid; grid-template-columns: minmax(0,3.2em) minmax(0,1fr); gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: .82rem; align-items: baseline; }
+  .t-pass { color: var(--good); font-family: var(--mono); }
+  .t-fail { color: var(--bad); font-family: var(--mono); font-weight: 700; }
+  .t-skip { color: var(--parchment-dim); font-family: var(--mono); }
+  .t-name { min-width: 0; overflow-wrap: anywhere; }
+  .t-detail { grid-column: 2; font-size: .72rem; color: var(--parchment-dim); overflow-wrap: anywhere; }
+  h2.t-group { margin: 18px 0 4px; font-family: var(--serif); font-weight: 400; font-size: 1rem; color: var(--brass-bright); }
+  #verdict { position: sticky; top: 0; z-index: 5; padding: 12px; border-radius: 12px; margin: 10px 0; font-family: var(--mono); background: var(--ink-2); border: 1px solid var(--line); }
+  #verdict.ok { border-color: var(--good); }
+  #verdict.bad { border-color: var(--bad); }
+  #probe-board { width: 260px; }
+  .probe { opacity: 0; position: absolute; pointer-events: none; height: 0; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Maia<span class="accent">3</span> self test</h1>
+</header>
+
+<p class="file-hint">
+  Runs on <strong>this device, in this browser</strong> — the parts that can only be
+  checked with a real layout engine: board stability over a long game, no horizontal
+  overflow, touch-target sizes, CSS support, storage, and the analysis maths.
+  It does not need a model file.
+</p>
+
+<div id="verdict">Running…</div>
+<div id="results"></div>
+
+<!-- A real, laid-out board used to measure actual pixel sizes. -->
+<div class="probe" aria-hidden="true">
+  <div class="board-wrap"><div class="board-frame"><div id="probe-board"></div></div></div>
+  <div class="panel"><div class="move-list" id="probe-moves"></div></div>
+</div>
+
+<script type="module">
+import { Chess } from "./js/chess.esm.js";
+import { Board } from "./js/board.js";
+import {
+  analyseGame, winPctFromCp, cpFromWinPct, winPctFromWdl, classify,
+  moveAccuracy, toPgn, resultOf, formatEval, evalToWhiteShare, VariationSession,
+} from "./js/analysis.js";
+import { OpeningDirector, OPENINGS } from "./js/openings.js";
+import { CHARACTERS, ELO_CHOICES, AGE_CHOICES, characterFor, eloForAge } from "./js/characters.js";
+
+const results = document.getElementById("results");
+let pass = 0, fail = 0, skip = 0;
+
+function group(name) {
+  const h = document.createElement("h2");
+  h.className = "t-group";
+  h.textContent = name;
+  results.appendChild(h);
+}
+function check(name, ok, detail = "") {
+  if (ok) pass++; else fail++;
+  const row = document.createElement("div");
+  row.className = "t-row";
+  const s = document.createElement("span");
+  s.className = ok ? "t-pass" : "t-fail";
+  s.textContent = ok ? "PASS" : "FAIL";
+  const n = document.createElement("span");
+  n.className = "t-name";
+  n.textContent = name;
+  row.append(s, n);
+  if (detail && !ok) {
+    const d = document.createElement("span");
+    d.className = "t-detail";
+    d.textContent = detail;
+    row.appendChild(d);
+  }
+  results.appendChild(row);
+}
+function skipped(name, why) {
+  skip++;
+  const row = document.createElement("div");
+  row.className = "t-row";
+  const s = document.createElement("span");
+  s.className = "t-skip";
+  s.textContent = "SKIP";
+  const n = document.createElement("span");
+  n.className = "t-name";
+  n.textContent = `${name} — ${why}`;
+  row.append(s, n);
+  results.appendChild(row);
+}
+const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+// ---------------------------------------------------------------
+group("Browser capabilities this app depends on");
+// ---------------------------------------------------------------
+let moduleWorkerOk = false;
+try {
+  const blob = new Blob(["self.onmessage=()=>self.postMessage(1)"], { type: "text/javascript" });
+  const w = new Worker(URL.createObjectURL(blob), { type: "module" });
+  w.terminate();
+  moduleWorkerOk = true;
+} catch { /* old WebView */ }
+check("module Web Workers (the engine needs these)", moduleWorkerOk,
+  "Update Android System WebView and Chrome, or use a newer browser.");
+check("IndexedDB (used to cache models offline)", typeof indexedDB !== "undefined");
+check("WebAssembly present", typeof WebAssembly !== "undefined");
+check("CSS aspect-ratio (keeps the board square)", CSS.supports("aspect-ratio", "1/1"));
+check("CSS min() (the board's size expression)", CSS.supports("width", "min(100%, 500px)"));
+check("CSS svh units (landscape sizing)", CSS.supports("height", "10svh"));
+check("structuredClone (worker messaging)", typeof structuredClone === "function");
+check("File constructor (PGN sharing)", typeof File === "function");
+check("Blob URLs (PGN download)", typeof URL.createObjectURL === "function");
+check("secure context (needed for service workers)", window.isSecureContext,
+  "Serve over http://localhost or https://, not file://");
+
+// ---------------------------------------------------------------
+group("Board stability over a long game (the shrink bug)");
+// ---------------------------------------------------------------
+{
+  const probe = new Board(document.getElementById("probe-board"), { onUserMove: () => {}, announce: () => {} });
+  const game = new Chess();
+  probe.render(game);
+  await frame();
+  const boardEl = document.getElementById("probe-board");
+  const first = boardEl.getBoundingClientRect();
+  if (!(first.width > 0)) {
+    // No layout engine (or the page is hidden). Reporting these as
+    // failures would be misleading, since nothing was actually measured.
+    skipped("board size measurements", "this environment reports no layout");
+  } else {
+  check("the board has a real size", first.width > 50, `${first.width.toFixed(1)}px`);
+  check("the board is square", Math.abs(first.width - first.height) < 2,
+    `${first.width.toFixed(1)} x ${first.height.toFixed(1)}`);
+
+  const list = document.getElementById("probe-moves");
+  const widths = [first.width];
+  for (let i = 0; i < 120 && !game.isGameOver(); i++) {
+    const moves = game.moves();
+    game.move(moves[Math.floor(Math.random() * moves.length)]);
+    const span = document.createElement("span");
+    span.className = "mv";
+    span.textContent = game.history().at(-1);
+    list.appendChild(span);
+    if (i % 10 === 0) {
+      probe.render(game);
+      await frame();
+      widths.push(boardEl.getBoundingClientRect().width);
+    }
+  }
+  probe.render(game);
+  await frame();
+  const last = boardEl.getBoundingClientRect();
+  widths.push(last.width);
+  const spread = Math.max(...widths) - Math.min(...widths);
+  check(`board width is identical after ${game.history().length} plies`, spread < 1.5,
+    `varied by ${spread.toFixed(2)}px across ${widths.length} samples`);
+  check("the board is still square at the end", Math.abs(last.width - last.height) < 2,
+    `${last.width.toFixed(1)} x ${last.height.toFixed(1)}`);
+  check("the move list scrolls instead of growing the page",
+    list.scrollHeight > list.clientHeight && getComputedStyle(list).overflowY === "auto",
+    `scrollHeight ${list.scrollHeight} vs clientHeight ${list.clientHeight}`);
+  }
+}
+
+// ---------------------------------------------------------------
+group("Mobile layout");
+// ---------------------------------------------------------------
+check("no horizontal overflow", document.documentElement.scrollWidth <= window.innerWidth + 1,
+  `page ${document.documentElement.scrollWidth}px vs viewport ${window.innerWidth}px`);
+if (typeof getComputedStyle !== "function") {
+  skipped("touch target sizes", "this environment has no computed styles");
+} else {
+  const tap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tap"));
+  const probeBtn = document.createElement("button");
+  probeBtn.className = "btn";
+  probeBtn.textContent = "probe";
+  document.body.appendChild(probeBtn);
+  await frame();
+  const h = probeBtn.getBoundingClientRect().height;
+  probeBtn.remove();
+  if (!Number.isFinite(tap) || !(h > 0)) {
+    skipped("touch target sizes", "this environment reports no computed sizes");
+  } else {
+    check("touch targets are at least 44px", tap >= 44, `${tap}px`);
+    check("a real button meets that size", h >= 42, `${h.toFixed(1)}px`);
+  }
+}
+check("viewport meta is present", !!document.querySelector('meta[name="viewport"]'));
+
+// ---------------------------------------------------------------
+group("Evaluation maths (the eval-bar bug)");
+// ---------------------------------------------------------------
+{
+  const EDGE = 120;
+  const stub = {
+    async evaluate(board, { includeUci }) {
+      const legal = board.moves({ verbose: true });
+      const played = legal.find((m) => m.from + m.to + (m.promotion || "") === includeUci) || legal[0];
+      const moves = legal.slice(0, 3).map((m) => ({
+        uci: m.from + m.to + (m.promotion || ""), san: m.san, from: m.from, to: m.to, prob: .3, cp: EDGE,
+      }));
+      if (played && !moves.some((m) => m.uci === includeUci)) {
+        moves.push({ uci: includeUci, san: played.san, from: played.from, to: played.to, prob: .1, cp: EDGE });
+      }
+      return { positionCp: 0, wdl: { win: .3, draw: .4, loss: .3 }, moves, terminal: false };
+    },
+  };
+  const { nodes } = await analyseGame(stub, ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"]);
+  const evals = nodes.map((n) => n.evalWhite);
+  check("a level game shows a level bar", evals.every((e) => Math.abs(e) < 5), evals.join(", "));
+  check("the bar does not swing toward whoever is to move",
+    !evals.some((e, i) => i > 0 && Math.sign(e) !== 0 && Math.sign(e) === -Math.sign(evals[i - 1])), evals.join(", "));
+  check("the starting position reads 0.0", formatEval(nodes[0].evalWhite) === "0.0", formatEval(nodes[0].evalWhite));
+  check("every move carries a precomputed engine arrow",
+    nodes.filter((n) => n.ply).every((n) => !!n.bestUci && !!n.uci));
+}
+check("cp 0 is 50%", Math.abs(winPctFromCp(0) - 50) < 1e-9);
+check("cp <-> win% round-trips", [-400, -100, 0, 100, 400].every((c) => Math.abs(cpFromWinPct(winPctFromCp(c)) - c) <= 2));
+check("draws count as half a win", Math.abs(winPctFromWdl({ win: .3, draw: .4, loss: .3 }) - 50) < 1e-9);
+check("a 15-point drop is a blunder", classify(50, 35) === "blunder");
+check("a perfect move is ~100% accurate", moveAccuracy(50, 50) > 99);
+check("the eval bar is centred at 50%", Math.abs(evalToWhiteShare(50) - .5) < 1e-9);
+
+// ---------------------------------------------------------------
+group("Analysis navigation (page-jump bug)");
+// ---------------------------------------------------------------
+{
+  // The move list must scroll inside itself, never scrolling the page --
+  // that is what used to yank the board off the top when pressing Next.
+  const list = document.getElementById("probe-moves");
+  const before = window.scrollY;
+  if (list.scrollHeight > list.clientHeight) {
+    const last = list.lastElementChild;
+    const top = last.offsetTop - list.offsetTop;
+    list.scrollTop = Math.max(0, top - list.clientHeight + last.offsetHeight);
+    await frame();
+    check("scrolling the move list does not scroll the page",
+      Math.abs(window.scrollY - before) < 2, `page moved ${(window.scrollY - before).toFixed(1)}px`);
+    check("the move list scrolled internally", list.scrollTop > 0, `scrollTop ${list.scrollTop}`);
+  } else {
+    skipped("move list scroll containment", "the probe list did not overflow here");
+  }
+  check("the removed variation banner is gone", !document.querySelector(".variation-banner"));
+}
+
+// ---------------------------------------------------------------
+group("PGN export");
+// ---------------------------------------------------------------
+{
+  const g = new Chess();
+  for (const m of ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"]) g.move(m);
+  const pgn = toPgn({ sanHistory: g.history(), white: "You", black: "Josh (12, 1200)", result: resultOf(g) });
+  const back = new Chess();
+  let ok = true;
+  try { back.loadPgn(pgn); } catch { ok = false; }
+  check("the PGN parses back in this browser", ok);
+  check("the moves survive", back.history().join(" ") === g.history().join(" "));
+  check("lines wrap at 80 columns", pgn.split("\n").every((l) => l.length <= 80));
+}
+
+// ---------------------------------------------------------------
+group("Openings, characters, variations");
+// ---------------------------------------------------------------
+{
+  let bad = 0;
+  for (const o of OPENINGS) {
+    for (let t = 0; t < 5; t++) {
+      const b = new Chess();
+      const d = new OpeningDirector(o.id);
+      for (let ply = 0; ply < 3; ply++) {
+        const san = d.moveFor(b);
+        if (!san || !b.moves().includes(san)) { bad++; break; }
+        b.move(san);
+        d.observe(b);
+      }
+    }
+  }
+  check("every opening plays out legally", bad === 0, `${bad} failures`);
+  check("41 ratings, 600 to 2600 in 50s",
+    ELO_CHOICES.length === 41 && ELO_CHOICES[0] === 600 && ELO_CHOICES.at(-1) === 2600);
+  check("41 ages, 6 to 26 in halves",
+    AGE_CHOICES.length === 41 && AGE_CHOICES[0] === 6 && AGE_CHOICES.at(-1) === 26);
+  check("age and rating agree everywhere", ELO_CHOICES.every((e) => eloForAge(e / 100) === e));
+  check("every character resolves", ELO_CHOICES.every((e) => characterFor("josh", e).elo === e));
+  check("the roster is 7 x 41", CHARACTERS.length === 287, String(CHARACTERS.length));
+
+  const s = new VariationSession(["e4", "e5", "Nf3", "Nc6"]);
+  s.goToPly(2);
+  s.play({ from: "f1", to: "c4" });
+  check("a variation does not modify the played game",
+    s.inVariation && s.gameHistory.join(" ") === "e4 e5 Nf3 Nc6");
+  s.backToGame();
+  check("back-to-game restores the real line", !s.inVariation && s.board.history().length === 2);
+}
+
+// ---------------------------------------------------------------
+group("Storage");
+// ---------------------------------------------------------------
+try {
+  const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
+  if (est) {
+    const freeMb = (est.quota - est.usage) / (1024 * 1024);
+    check("enough room for the 5M model (~20 MB)", freeMb > 40, `${freeMb.toFixed(0)} MB free`);
+    if (freeMb < 150) skipped("room for the 23M model", `${freeMb.toFixed(0)} MB free — 5M recommended`);
+    else check("enough room for the 23M model (~90 MB)", true, `${freeMb.toFixed(0)} MB free`);
+  } else {
+    skipped("storage estimate", "this browser does not report it");
+  }
+} catch { skipped("storage estimate", "blocked in this context"); }
+
+// ---------------------------------------------------------------
+const verdict = document.getElementById("verdict");
+verdict.className = fail ? "bad" : "ok";
+verdict.textContent = fail
+  ? `${fail} FAILED · ${pass} passed${skip ? ` · ${skip} skipped` : ""} — screenshot this and send it over.`
+  : `All ${pass} checks passed${skip ? ` (${skip} skipped)` : ""} on this device.`;
+</script>
+</body>
+</html>

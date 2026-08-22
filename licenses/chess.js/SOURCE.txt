@@ -1,0 +1,13 @@
+chess.js
+
+Author:
+    Jeff Hlywa
+
+Version represented by the bundled source:
+    1.4.0
+
+License:
+    BSD-2-Clause
+
+Source:
+    https://github.com/jhlywa/chess.js

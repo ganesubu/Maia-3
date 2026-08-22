@@ -1,0 +1,1027 @@
+/* =====================================================================
+   Maia3 — mobile-first styles.
+
+   THE BOARD-SHRINK BUG, AND WHY IT CANNOT HAPPEN IN THIS LAYOUT
+   ------------------------------------------------------------
+   The old layout put the board and the move list in the same CSS grid:
+
+       main { grid-template-columns: minmax(0, 640px) 1fr; }
+
+   `1fr` means `minmax(auto, 1fr)`, and `auto` as a track MINIMUM means
+   "at least this track's min-content width". The move list had no width
+   containment, so every appended move raised its track's min-content
+   demand; grid satisfied that by taking width from the board's track,
+   whose minimum was 0 and therefore infinitely squeezable. The board is
+   `width:100%; aspect-ratio:1/1`, so it shrank with its column — one move
+   at a time. The board's own CSS was never the problem.
+
+   Three structural rules make it impossible here, rather than patched:
+
+     1. THE BOARD IS NOT A GRID/FLEX SIBLING OF ANY GROWING CONTENT.
+        `.board-wrap` is a block-level container whose width comes from the
+        page, and the board's size is `min(100%, var(--board-max))` where
+        --board-max is defined purely in viewport units. No sibling can
+        appear in that calculation.
+     2. EVERY grid track in the app is `minmax(0, ...)`, and every grid or
+        flex child carries `min-width: 0`, so no track minimum anywhere is
+        ever derived from content.
+     3. THE MOVE LIST IS BOUNDED IN BOTH AXES — fixed column template,
+        `max-height` + `overflow:auto`, `overflow-wrap:anywhere`. Its
+        content cannot demand space in either direction.
+
+   Board size is therefore a pure function of the viewport: identical at
+   move 1, move 50 and move 500.
+   ===================================================================== */
+
+:root {
+  --ink: #14211c;
+  --ink-2: #1c2b25;
+  --ink-3: #24352d;
+  --ink-4: #2e4238;
+  --parchment: #ede6d6;
+  --parchment-dim: #b9b3a2;
+  --walnut-dark: #6b4a37;
+  --walnut-light: #efe0c8;
+  --brass: #c9a227;
+  --brass-bright: #e6c257;
+  --coral: #d1654f;
+  --good: #7fae6f;
+  --warn: #d8b155;
+  --bad: #c9614a;
+  --line: rgba(237, 230, 214, 0.14);
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", ui-serif, serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Consolas", monospace;
+  --sans: -apple-system, "Segoe UI", Roboto, ui-sans-serif, sans-serif;
+  --radius: 14px;
+  --tap: 44px;
+  --board-max: 100%; /* viewport-derived only — never content-derived */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--ink);
+  color: var(--parchment);
+  font-family: var(--sans);
+  overflow-x: hidden; /* no horizontal scrolling, ever */
+}
+
+body {
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  max-width: 1100px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.screen[hidden] {
+  display: none;
+}
+
+/* ---- header ---------------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.app-header h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 1.5rem;
+  margin: 0;
+  white-space: nowrap;
+}
+.app-header h1 .accent {
+  color: var(--brass-bright);
+  font-style: italic;
+}
+.icon-btn {
+  font-size: 1.15rem;
+  line-height: 1;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--parchment);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.lede {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  margin: 2px 0 0;
+  color: var(--parchment);
+}
+
+/* ---- screen 1: roster ------------------------------------------------ */
+
+.roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.roster-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 6px;
+  min-width: 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--parchment);
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+.roster-card[aria-pressed="true"] {
+  border-color: var(--brass-bright);
+  background: var(--ink-3);
+  box-shadow: 0 0 0 1px var(--brass-bright) inset;
+}
+.roster-portrait svg,
+.chooser-portrait svg,
+.strip-portrait svg {
+  display: block;
+  border-radius: 50%;
+}
+.roster-name {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+}
+.roster-arch {
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  min-width: 0;
+}
+.chooser-card {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+.chooser-meta {
+  min-width: 0;
+}
+.chooser-meta h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 1.5rem;
+  margin: 0 0 2px;
+}
+.chooser-line {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--parchment-dim);
+}
+.archetype {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brass-bright);
+}
+.chooser-blurb {
+  margin: 8px 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  line-height: 1.45;
+}
+.chooser-bio {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--parchment-dim);
+  line-height: 1.45;
+}
+.tendencies {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.tendencies li {
+  font-size: 0.72rem;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  color: var(--parchment-dim);
+}
+
+.age-picker {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.age-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  padding: 6px 4px;
+  line-height: 1.2;
+}
+.age-btn strong {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 400;
+}
+.age-btn span {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--parchment-dim);
+}
+.age-btn[aria-pressed="true"] span {
+  color: var(--brass-bright);
+}
+
+/* ---- shared controls -------------------------------------------------- */
+
+.controls,
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.btn {
+  transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
+  font: inherit;
+  font-size: 0.85rem;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--parchment);
+  cursor: pointer;
+  flex: 1 1 auto;
+  min-width: 0;
+  touch-action: manipulation;
+}
+.btn.grow {
+  flex: 1 1 30%;
+}
+.btn.small {
+  min-height: 34px;
+  font-size: 0.76rem;
+  flex: 0 0 auto;
+  padding: 0 10px;
+}
+.btn.big {
+  min-height: 52px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.btn.primary {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #1a1408;
+  font-weight: 600;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn[aria-pressed="true"] {
+  outline: 2px solid var(--brass-bright);
+  outline-offset: -2px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field > label,
+.mini-label {
+  font-size: 0.78rem;
+  color: var(--parchment-dim);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.field-value {
+  font-family: var(--mono);
+  color: var(--brass-bright);
+}
+.select {
+  font: inherit;
+  font-size: 0.9rem;
+  min-height: var(--tap);
+  padding: 0 10px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--parchment);
+  width: 100%;
+  min-width: 0;
+}
+.row .select {
+  flex: 1 1 60%;
+  width: auto;
+}
+.row .btn {
+  flex: 0 1 auto;
+}
+input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--brass);
+  min-height: 32px;
+}
+.checkbox-field > label {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  line-height: 1.4;
+}
+.checkbox-field input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+input[type="file"] {
+  font-size: 0.8rem;
+  color: var(--parchment-dim);
+  max-width: 100%;
+}
+.file-hint {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--parchment-dim);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.panel {
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  min-width: 0;
+}
+.panel h2,
+.panel > summary {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+.panel > summary {
+  cursor: pointer;
+  min-height: 30px;
+}
+.inline-btn {
+  float: right;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.panel .num {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--parchment-dim);
+}
+
+/* ---- screen 2: opponent strip + board -------------------------------- */
+
+.game-header {
+  gap: 8px;
+}
+.opponent-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.strip-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.strip-name {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+.strip-sub {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--parchment-dim);
+  overflow-wrap: anywhere;
+}
+
+/* The board's container is a plain block: its width comes from the page,
+   never from a sibling's content. */
+.board-wrap {
+  width: 100%;
+  min-width: 0;
+}
+.board-frame {
+  background: linear-gradient(160deg, var(--walnut-dark), #4a3226);
+  padding: 6px;
+  border-radius: var(--radius);
+  box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.6);
+  width: min(100%, var(--board-max));
+  margin-inline: auto;
+  min-width: 0;
+}
+
+#board,
+#analysis-board {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  touch-action: manipulation;
+}
+.board-row {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.square {
+  flex: 1 1 0;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.square.light {
+  background: var(--walnut-light);
+}
+.square.dark {
+  background: #b98454;
+}
+.square .piece {
+  width: 88%;
+  height: 88%;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+  /* The move animation drives `transform` from JS; declaring it here keeps
+     the compositor aware of it without forcing a layer permanently. */
+  will-change: transform;
+}
+.square.selected,
+.square.legal-target,
+.square.last-move {
+  transition: box-shadow 120ms ease;
+}
+.square.selected {
+  box-shadow: inset 0 0 0 3px var(--brass-bright);
+}
+.square.legal-target::after {
+  content: "";
+  position: absolute;
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: rgba(20, 33, 28, 0.42);
+}
+.square.legal-target.has-piece-target::after {
+  width: 88%;
+  height: 88%;
+  background: transparent;
+  box-shadow: inset 0 0 0 4px rgba(20, 33, 28, 0.55);
+}
+.square.last-move {
+  box-shadow: inset 0 0 0 999px rgba(201, 162, 39, 0.28);
+}
+.square.selected.last-move {
+  box-shadow: inset 0 0 0 3px var(--brass-bright), inset 0 0 0 999px rgba(201, 162, 39, 0.28);
+}
+.square.in-check {
+  box-shadow: inset 0 0 0 999px rgba(209, 101, 79, 0.45);
+}
+
+/* Arrow overlay: never intercepts a tap meant for a square. */
+.arrow-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.arrow {
+  stroke-linecap: round;
+  stroke-width: 0.13;
+}
+/* Green = the move the engine would play. Yellow = the move you played.
+   Only two arrows are ever drawn, and when they agree only the green one
+   appears -- a doubled arrow reads as a mistake at a glance. */
+.arrow-best {
+  stroke: rgba(106, 190, 96, 0.95);
+  fill: rgba(106, 190, 96, 0.95);
+}
+.arrow-played {
+  stroke: rgba(232, 190, 60, 0.92);
+  fill: rgba(232, 190, 60, 0.92);
+}
+.arrow-alt {
+  stroke: rgba(230, 194, 87, 0.55);
+  fill: rgba(230, 194, 87, 0.55);
+}
+.arrow-layer .arrow {
+  transition: opacity 140ms ease;
+}
+
+.arrow-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.72rem;
+  color: var(--parchment-dim);
+  align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.arrow-legend .swatch {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.swatch-best { background: rgba(106, 190, 96, 0.95); }
+.swatch-played { background: rgba(232, 190, 60, 0.92); }
+.arrow-head {
+  stroke-width: 0.02;
+}
+
+.status-line {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--parchment-dim);
+  min-height: 1.3em;
+  overflow-wrap: anywhere;
+}
+.status-line.thinking {
+  color: var(--brass-bright);
+}
+.status-line.thinking::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-left: 0.45em;
+  border-radius: 50%;
+  background: var(--brass-bright);
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+.thinking-note {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--brass-bright);
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+/* ---- move list: bounded in BOTH axes --------------------------------- */
+
+.move-list {
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3px 6px;
+  align-content: start;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  max-height: clamp(110px, 20vh, 240px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.move-list .mv-num {
+  color: var(--parchment-dim);
+}
+.move-list .mv {
+  min-width: 0;
+}
+.move-list .mv.current {
+  color: var(--brass-bright);
+  font-weight: 600;
+}
+.analysis-moves .mv {
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 0 3px;
+}
+.analysis-moves .mv.cls-best { color: #6abe60; }
+.analysis-moves .mv.cls-inaccuracy { color: var(--warn); }
+.analysis-moves .mv.cls-mistake { color: #e08a4a; }
+.analysis-moves .mv.cls-blunder { color: var(--bad); font-weight: 600; }
+.analysis-moves .mv.current {
+  background: var(--ink-4);
+}
+
+/* ---- screen 3: analysis ---------------------------------------------- */
+
+.analysis-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.analysis-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Eval bar sits beside the board. The bar is a FIXED width, so the board's
+   size still depends only on the viewport. */
+.board-with-bar {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+}
+.board-with-bar.exploring .board-frame {
+  box-shadow: 0 0 0 2px var(--brass-bright), 0 14px 34px -18px rgba(0, 0, 0, 0.6);
+}
+.eval-bar {
+  position: relative;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #22201d;
+  border: 1px solid var(--line);
+  min-height: 120px;
+}
+.eval-white {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 50%;
+  background: #e8e2d4;
+  /* Eased rather than linear so the bar settles instead of snapping; the
+     duration is short enough that stepping quickly through a game still
+     feels immediate. */
+  transition: height 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: height;
+}
+.eval-bar.pending {
+  opacity: 0.55;
+}
+.eval-bar {
+  transition: opacity 160ms ease;
+}
+.eval-number {
+  transition: color 160ms ease;
+}
+.eval-number.black-ahead {
+  color: var(--parchment);
+}
+.eval-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.eval-number {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  color: var(--brass-bright);
+}
+.context-label {
+  font-size: 0.78rem;
+  color: var(--parchment-dim);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* The "exploring a variation" state is shown by the gold board outline and
+   the Back-to-game button appearing in the nav row -- no banner. A banner
+   here pushed the controls down the page every time you stepped off the
+   line, which moved the buttons under your thumb. */
+.nav-controls .btn {
+  flex: 1 1 0;
+  font-size: 0.95rem;
+}
+.nav-controls #back-to-game-line {
+  flex: 1 1 100%;
+  font-size: 0.85rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 8em) minmax(0, 1fr);
+  gap: 5px 10px;
+  font-size: 0.82rem;
+  min-width: 0;
+}
+.detail-label {
+  color: var(--parchment-dim);
+}
+.detail-value {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.cls-best { color: #6abe60; }
+.cls-good { color: var(--good); }
+.cls-inaccuracy { color: var(--warn); }
+.cls-mistake { color: #e08a4a; }
+.cls-blunder { color: var(--bad); }
+
+.accuracy-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+.accuracy-card {
+  background: var(--ink-3);
+  border-radius: 11px;
+  padding: 10px;
+  text-align: center;
+  min-width: 0;
+}
+.accuracy-who {
+  font-size: 0.7rem;
+  color: var(--parchment-dim);
+  overflow-wrap: anywhere;
+}
+.accuracy-value {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  color: var(--brass-bright);
+  line-height: 1.25;
+}
+.accuracy-sub {
+  font-size: 0.62rem;
+  color: var(--parchment-dim);
+}
+
+.summary-grid {
+  display: grid;
+  /* One name column plus one per entry in CLASSES (best/good/inaccuracy/
+     mistake/blunder) -- keep this in sync with analysis.js's CLASSES. */
+  grid-template-columns: minmax(0, 3.2em) repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.72rem;
+}
+.summary-head {
+  text-align: center;
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.summary-name {
+  font-size: 0.82rem;
+  color: var(--parchment-dim);
+}
+.summary-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 2px;
+  border-radius: 8px;
+  background: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  min-width: 0;
+}
+
+/* ---- progress, dialogs ----------------------------------------------- */
+
+.load-progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ink-3);
+  overflow: hidden;
+}
+.load-progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--brass);
+  transition: width 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.load-progress-fill.indeterminate {
+  animation: slide 1.1s ease-in-out infinite;
+}
+@keyframes slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+#engine-status .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: var(--coral);
+}
+#engine-status.ready .dot {
+  background: var(--good);
+}
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  color: var(--parchment);
+  width: min(94vw, 460px);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 16px;
+}
+dialog h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  margin: 0 0 12px;
+}
+dialog .field {
+  margin-bottom: 14px;
+}
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+#promo-dialog {
+  width: min(92vw, 340px);
+}
+.promo-choices {
+  display: flex;
+  gap: 8px;
+}
+.promo-choice {
+  flex: 1 1 0;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--walnut-light);
+  cursor: pointer;
+  padding: 4px;
+}
+.promo-choice .piece {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- responsive ------------------------------------------------------
+   Only --board-max and column counts change. No breakpoint ever makes the
+   board's size depend on sibling content. */
+
+@media (orientation: landscape) and (max-height: 640px) {
+  :root {
+    --board-max: min(100%, 74svh);
+  }
+  .screen-game,
+  .analysis-body {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  .screen-game > .app-header,
+  .screen-game > .board-wrap {
+    grid-column: 1;
+  }
+  .screen-game > .app-header {
+    grid-column: 1 / -1;
+  }
+  /* Everything else (settings, status, action buttons, nav controls,
+     game-over panel, move list) goes in the right-hand column, no matter
+     what order it appears in the markup — the landscape layout must not
+     depend on the portrait reading order above. */
+  .screen-game > *:not(.app-header):not(.board-wrap) {
+    grid-column: 2;
+  }
+  .board-frame {
+    width: min(74svh, 100%);
+  }
+  .move-list {
+    max-height: 34svh;
+  }
+}
+
+@media (min-width: 560px) {
+  :root {
+    --board-max: 520px;
+  }
+  .roster {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  :root {
+    --board-max: min(560px, 74svh);
+  }
+  .app-header h1 {
+    font-size: 1.8rem;
+  }
+  .move-list {
+    max-height: clamp(160px, 26vh, 320px);
+  }
+}
+
+
+/* Four-position navigation controls on the live game board. They are kept
+   visually separate from game actions so reviewing history never looks like
+   undoing the actual game. */
+.game-nav-controls {
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.game-nav-controls .btn {
+  min-width: 3.1rem;
+}
+
+

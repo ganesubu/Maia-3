@@ -1,0 +1,12 @@
+Cburnett chess pieces
+
+Author:
+    Colin M. L. Burnett (Cburnett)
+
+License:
+    GNU GPL v2 or later (GPLv2+)
+
+Attribution/source:
+    Lichess lila: https://github.com/lichess-org/lila
+
+The bundled SVG chess pieces are the Cburnett set.

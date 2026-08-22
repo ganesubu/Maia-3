@@ -1,0 +1,13 @@
+Maia-3 source and licensing
+
+Project:
+    https://github.com/CSSLab/maia3
+
+License:
+    AGPL-3.0
+
+Official license text:
+    https://www.gnu.org/licenses/agpl-3.0.html
+
+This repository contains JavaScript inference code derived from the Maia-3
+architecture plus the project's original personality/application code.
