@@ -1,0 +1,84 @@
+name: Regression tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install DOM test dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          CI_DEPS="${RUNNER_TEMP}/maia3-test-deps"
+          npm install --prefix "$CI_DEPS" --no-save --no-package-lock --no-audit --no-fund jsdom
+          ln -s "$CI_DEPS/node_modules" "$GITHUB_WORKSPACE/node_modules"
+
+      - name: Install Android packaging dependencies
+        working-directory: android-build
+        run: npm install
+
+      - name: Prepare generated Android web payload
+        working-directory: android-build
+        run: npm run prepare-www
+
+      - name: Generate tiny test model
+        run: python3 tests/make_tiny_model.py tests/tiny-model.bin
+
+      - name: Run regression suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            tests/accuracy-formula-regression.mjs
+            tests/adaptive-chunk-alignment-test.mjs
+            tests/analysis-test.mjs
+            tests/android-test.mjs
+            tests/app-dom-test.mjs
+            tests/characters-test.mjs
+            tests/cpu-micro-optimization-test.mjs
+            tests/engine-test.mjs
+            tests/forward-batch-stage-test.mjs
+            tests/layout-test.mjs
+            tests/mate-classification-regression.mjs
+            tests/model-load-state-test.mjs
+            tests/openings-test.mjs
+            tests/performance-safe-optimizations-test.mjs
+            tests/personality-test.mjs
+            tests/policy-temperature-regression.mjs
+            tests/stockfish-engine-concurrency-test.mjs
+            tests/stockfish-engine-robust-test.mjs
+            tests/stockfish-engine-test.mjs
+            tests/temperature-settings-test.mjs
+            tests/variation-history-test.mjs
+            tests/worker-pool-test.mjs
+          )
+
+          for test in "${tests[@]}"; do
+            echo "========================================"
+            echo "Running $test"
+            echo "========================================"
+            node "$test"
+          done
