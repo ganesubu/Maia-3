@@ -1,0 +1,89 @@
+name: Build Maia3 Android APK
+
+# Builds an installable APK without you installing Android Studio, the
+# Android SDK, Java or Gradle. Push this repo to GitHub, then run the
+# workflow from the Actions tab and download the APK artifact.
+#
+# This file must sit at the REPOSITORY ROOT as .github/workflows/android.yml
+# (GitHub only looks there), while the Android project stays in
+# android-build/. Upload the CONTENTS of the maia3-web folder to the root of
+# the repo and both paths line up.
+#
+# The public repository includes the 5M model in weights/. The build therefore
+# bundles the 5M model automatically. Larger models are optional and should
+# only be committed/bundled deliberately.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Capacitor
+        working-directory: android-build
+        run: npm install
+
+      - name: Fetch Stockfish analysis engine
+        run: |
+          mkdir -p stockfish
+          npm install --no-save --ignore-scripts stockfish@18.0.8
+          cp node_modules/stockfish/bin/stockfish-18-lite-single.js stockfish/stockfish-18-lite-single.js
+          cp node_modules/stockfish/bin/stockfish-18-lite-single.wasm stockfish/stockfish-18-lite-single.wasm
+          cp node_modules/stockfish/Copying.txt stockfish/Copying.txt
+          ls -lh stockfish
+
+      - name: Copy the web app into www/
+        working-directory: android-build
+        run: npm run prepare-www
+
+      - name: Create the Android project
+        working-directory: android-build
+        run: npx cap add android
+
+      - name: Sync web assets into the Android project
+        working-directory: android-build
+        run: npx cap sync android
+
+      - name: Allow large model files in the APK
+        working-directory: android-build
+        # Android compresses assets by default, which both bloats build
+        # time and, over ~1 GB uncompressed, can break asset extraction.
+        # .bin files are already dense, so compressing them buys nothing.
+        run: |
+          APP_GRADLE=android/app/build.gradle
+          if ! grep -q "noCompress" "$APP_GRADLE"; then
+            sed -i '/^android {/a\    androidResources { noCompress += ["bin"] }' "$APP_GRADLE"
+          fi
+          cat "$APP_GRADLE"
+
+      - name: Build the debug APK
+        working-directory: android-build/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: maia3-chess-apk
+          path: android-build/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
