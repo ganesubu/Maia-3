@@ -1,58 +1,53 @@
 @echo off
 setlocal
-title Maia 3 Chess - Portable Local Server
 cd /d "%~dp0"
+title Maia 3 - Portable Windows
 
-set "PORT=8000"
-set "ROOT=%~dp0"
-set "SERVER=%~dp0Start Maia 3 Server.ps1"
+set "PORT=%~1"
+if "%PORT%"=="" set "PORT=8000"
 
 echo.
-echo   Maia 3
-echo   --------------------------------------------
-echo   Portable Windows launcher
+echo   Maia 3 - Portable Windows
+echo   =========================
 echo   No Python or Node.js required.
 echo.
 
-if not exist "%SERVER%" (
-    echo   ERROR: Start Maia 3 Server.ps1 is missing.
+if not exist "%~dp0Start Maia 3 Server.ps1" (
+    echo ERROR: Start Maia 3 Server.ps1 is missing.
     echo.
     pause
     exit /b 1
 )
 
-if not exist "stockfish\stockfish-18-lite-single.js" if not exist "stockfish\stockfish-18-lite-single.wasm" (
-    echo   Stockfish analysis engine is not present.
-    echo   Downloading the pinned Stockfish 18 lite build...
+rem Stockfish is optional for playing. If it is missing, the app can still
+rem play Maia. The first run downloads the pinned analysis engine.
+if not exist "%~dp0stockfish\stockfish-18-lite-single.js" (
+    echo Checking Stockfish...
+    if not exist "%~dp0stockfish" mkdir "%~dp0stockfish"
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+      "$ErrorActionPreference='Stop';" ^
+      "$root=(Split-Path -Parent '%~dp0Start Maia 3 Server.ps1');" ^
+      "try {" ^
+      "  Invoke-WebRequest -UseBasicParsing 'https://unpkg.com/stockfish@18.0.8/bin/stockfish-18-lite-single.js' -OutFile (Join-Path $root 'stockfish\stockfish-18-lite-single.js');" ^
+      "  Invoke-WebRequest -UseBasicParsing 'https://unpkg.com/stockfish@18.0.8/bin/stockfish-18-lite-single.wasm' -OutFile (Join-Path $root 'stockfish\stockfish-18-lite-single.wasm');" ^
+      "  if (-not (Test-Path (Join-Path $root 'stockfish\Copying.txt'))) { Invoke-WebRequest -UseBasicParsing 'https://unpkg.com/stockfish@18.0.8/Copying.txt' -OutFile (Join-Path $root 'stockfish\Copying.txt') };" ^
+      "  Write-Host 'Stockfish is ready.';" ^
+      "} catch {" ^
+      "  Write-Host 'Stockfish download failed:' $_.Exception.Message;" ^
+      "  Write-Host 'Maia play remains available; analysis needs Stockfish files.';" ^
+      "}"
     echo.
-    if not exist "stockfish" mkdir "stockfish"
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; try { Invoke-WebRequest 'https://unpkg.com/stockfish@18.0.8/bin/stockfish-18-lite-single.js' -OutFile 'stockfish\stockfish-18-lite-single.js'; Invoke-WebRequest 'https://unpkg.com/stockfish@18.0.8/bin/stockfish-18-lite-single.wasm' -OutFile 'stockfish\stockfish-18-lite-single.wasm'; if (-not (Test-Path 'stockfish\Copying.txt')) { Invoke-WebRequest 'https://unpkg.com/stockfish@18.0.8/Copying.txt' -OutFile 'stockfish\Copying.txt' }; Write-Host 'Stockfish downloaded successfully.' } catch { Write-Host ''; Write-Host 'WARNING: Stockfish download failed.'; Write-Host 'Analysis will not be available until the engine files are present.'; Write-Host $_.Exception.Message; Write-Host '' }"
 )
 
-if not exist "weights\maia3-5m.bin" if not exist "weights\maia3-23m.bin" if not exist "weights\maia3-79m.bin" (
-    echo.
-    echo   WARNING: no Maia model files were found in weights\.
-    echo   Copy at least one .bin file into that folder before playing,
-    echo   or load a .bin from the app's Advanced screen.
-    echo.
-)
-
+echo Starting the local server on port %PORT%...
 echo.
-echo   Starting portable local web server on port %PORT%...
-echo   No Python required.
-echo.
-echo   Keep this window open while playing.
-echo   Press Ctrl+C here to stop the server.
+echo Keep this window open while using Maia 3.
+echo Press Ctrl+C to stop.
 echo.
 
-start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SERVER%" -Root "%ROOT%" -Port %PORT%
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start Maia 3 Server.ps1" -Port %PORT%
 
-timeout /t 1 /nobreak >nul
-start "" "http://localhost:%PORT%/"
-
-echo   Opened http://localhost:%PORT%/
 echo.
-echo   For phone setup, put the phone on the same Wi-Fi and open:
-echo   http://YOUR-PC-IP:%PORT%/
-echo.
+echo Maia 3 server stopped.
 pause
