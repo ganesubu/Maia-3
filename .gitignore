@@ -1,0 +1,9 @@
+# Generated / local build output
+node_modules/
+android-build/android/
+android-build/www/
+.DS_Store
+Thumbs.db
+
+# Optional local Maia weight files (uncomment if you do not want to commit them)
+# weights/*.bin
