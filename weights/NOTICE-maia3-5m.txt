@@ -1,0 +1,29 @@
+Maia-3 5M weight provenance
+
+File:
+    maia3-5m.bin
+
+Source checkpoint:
+    UofTCSSLab/Maia3-5M
+    https://huggingface.co/UofTCSSLab/Maia3-5M
+
+Upstream checkpoint filename:
+    maia3-5m.pt
+
+Pinned upstream model revision used for provenance:
+    b6559de
+
+Conversion:
+    This .bin file is a converted/repackaged form of the upstream checkpoint,
+    produced with this repository's `convert_weights.py`.
+
+Upstream licensing note:
+    The Maia-3 source repository at https://github.com/CSSLab/maia3 is
+    AGPL-3.0. The Maia3-5M model card currently says "see repo for
+    code/weights license" rather than publishing a separate weight-only
+    license on the model card. This project therefore does not claim a
+    separate relicensing of the underlying weights.
+
+    Keep this provenance notice with the model file. For redistribution
+    questions specifically about the model weights, verify the upstream
+    terms with CSSLab/UofTCSSLab.

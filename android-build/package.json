@@ -1,0 +1,20 @@
+{
+  "name": "maia3-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android wrapper for the Maia3 chess app. The web app itself is the source of truth; this only packages it into an APK.",
+  "scripts": {
+    "prepare-www": "node prepare-www.mjs",
+    "add-android": "cap add android",
+    "sync": "cap sync android",
+    "build:debug": "cd android && ./gradlew assembleDebug",
+    "build": "npm run prepare-www && npm run sync && npm run build:debug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}
